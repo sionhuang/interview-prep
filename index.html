@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>面试题库记忆助手</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <h1>📋 面试题库记忆助手</h1>
+    <div class="header-right">
+      <span class="streak-badge" id="streakBadge">🔥 0 天</span>
+      <span class="date-label" id="dateLabel"></span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="daily">📅 今日任务</button>
+    <button class="tab" data-tab="browse">📚 题库浏览</button>
+    <button class="tab" data-tab="stats">📊 学习统计</button>
+  </nav>
+
+  <main class="content">
+    <!-- Daily Tasks Tab -->
+    <section id="tab-daily" class="tab-content active">
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" id="dailyProgress"></div>
+        <span class="progress-text" id="dailyProgressText">0/0</span>
+      </div>
+
+      <div id="dailySettings" class="daily-settings"></div>
+
+      <div id="newSection" class="task-section">
+        <h2 class="section-title">🆕 今日新题</h2>
+        <div id="newQuestions" class="question-list"></div>
+      </div>
+
+      <div id="reviewSection" class="task-section">
+        <h2 class="section-title">🔄 今日复习</h2>
+        <div id="reviewQuestions" class="question-list"></div>
+      </div>
+
+      <div id="allDone" class="all-done hidden">
+        🎉 今日任务全部完成！继续保持！
+      </div>
+
+      <details class="debug-panel" id="debugPanel">
+        <summary>🧪 日期模拟（测试用）</summary>
+        <div class="debug-row">
+          <label>模拟日期：</label>
+          <input type="date" id="debugDateInput">
+          <button id="debugApplyBtn" class="btn-apply">跳转</button>
+          <button id="debugNextBtn" class="btn-apply" style="background:#10b981;">+1天</button>
+          <button id="debugTodayBtn" class="btn-reset" style="padding:4px 12px;">回到今天</button>
+        </div>
+        <div class="debug-hint">设置模拟日期后，整个应用会以该日期计算任务。用于测试次日滚入、复习排程等。</div>
+      </details>
+    </section>
+
+    <!-- Browse Tab -->
+    <section id="tab-browse" class="tab-content">
+      <div class="browse-controls">
+        <input type="text" id="searchInput" placeholder="搜索题目..." class="search-input">
+        <select id="statusFilter" class="filter-select">
+          <option value="all">全部状态</option>
+          <option value="unlearned">未学习</option>
+          <option value="learning">学习中</option>
+          <option value="done">已完成</option>
+        </select>
+      </div>
+      <div id="browseList" class="question-list"></div>
+    </section>
+
+    <!-- Stats Tab -->
+    <section id="tab-stats" class="tab-content">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value" id="statTotal">98</div>
+          <div class="stat-label">总题目数</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statLearned">0</div>
+          <div class="stat-label">已学题目</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statStreak">0</div>
+          <div class="stat-label">连续打卡</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="statCompleted">0</div>
+          <div class="stat-label">完全掌握</div>
+        </div>
+      </div>
+      <div class="calendar-heatmap" id="heatmap"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-row">
+      <button id="exportBtn" class="btn-sync">📥 导出数据</button>
+      <button id="importBtn" class="btn-sync">📤 导入数据</button>
+      <button id="copyBtn" class="btn-sync">📋 复制到剪贴板</button>
+    </div>
+    <div class="footer-row">
+      <button id="resetBtn" class="btn-reset">🔄 重置学习进度</button>
+    </div>
+    <input type="file" id="importFile" accept=".json" style="display:none">
+  </footer>
+</div>
+
+<script src="js/questions.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
