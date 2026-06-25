@@ -138,6 +138,12 @@ function toggleComplete(questionId) {
 
   updateStreak(state, today);
   saveState(state);
+
+  // 触发云端同步（防抖）
+  if (typeof SyncManager !== "undefined") {
+    SyncManager.schedulePush();
+  }
+
   return state;
 }
 
@@ -183,6 +189,12 @@ function setDailyNewCount(count) {
   state.dailyNewCount = n;
   state.todayNewAssigned = null;
   saveState(state);
+
+  // 触发云端同步
+  if (typeof SyncManager !== "undefined") {
+    SyncManager.schedulePush();
+  }
+
   return true;
 }
 
@@ -690,7 +702,7 @@ function initDebugPanel() {
 }
 
 // ---- Init ----
-function init() {
+async function init() {
   if (typeof QUESTIONS === "undefined") {
     document.body.innerHTML =
       '<div style="text-align:center;padding:40px;">❌ 题库加载失败，请确保 questions.js 文件存在</div>';
@@ -701,6 +713,22 @@ function init() {
   initReset();
   initSyncButtons();
   initDebugPanel();
+
+  // 初始化登录面板
+  if (typeof initLoginPanel !== "undefined") {
+    initLoginPanel();
+  }
+
+  // 尝试恢复云端会话并同步数据
+  if (typeof SyncManager !== "undefined") {
+    const dataChanged = await SyncManager.init();
+    if (dataChanged) {
+      // 云端数据已合并到本地，需要重新渲染
+      renderAll();
+      return;
+    }
+  }
+
   renderAll();
 }
 

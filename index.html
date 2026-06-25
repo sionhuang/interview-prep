@@ -11,6 +11,9 @@
   <header class="header">
     <h1>📋 面试题库记忆助手</h1>
     <div class="header-right">
+      <span class="sync-indicator logged-out" id="syncIndicator" title="点击登录 / 注册">
+        <span class="sync-dot"></span>未登录
+      </span>
       <span class="streak-badge" id="streakBadge">🔥 0 天</span>
       <span class="date-label" id="dateLabel"></span>
     </div>
@@ -110,7 +113,21 @@
   </footer>
 </div>
 
+<!-- 登录面板弹窗 -->
+<div class="login-overlay" id="loginOverlay"></div>
+<div class="login-panel" id="loginPanel"></div>
+
+<!-- Supabase SDK (ESM → global) -->
+<script type="importmap">
+{ "imports": { "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2" } }
+</script>
+<script type="module">
+import { createClient } from "@supabase/supabase-js";
+window.supabase = { createClient };
+</script>
+
 <script src="js/questions.js"></script>
+<script src="js/sync.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
