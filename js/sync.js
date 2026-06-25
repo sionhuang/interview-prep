@@ -328,7 +328,7 @@ const SyncManager = {
         localState.streak = merged.streak;
         localState.lastStreakDate = merged.lastStreakDate;
         localState.dailyNewCount = merged.dailyNewCount;
-        localState.todayNewAssigned = null; // 重新计算当日任务
+        // 注意：不重置 todayNewAssigned，保持当日任务分配不变
         saveState(localState);
         saveSyncMeta({ lastPulledAt: new Date().toISOString() });
         console.log("✅ 已从云端恢复数据");
@@ -447,7 +447,6 @@ function renderLoginForm(errorMsg = "") {
         localState.streak = merged.streak;
         localState.lastStreakDate = merged.lastStreakDate;
         localState.dailyNewCount = merged.dailyNewCount;
-        localState.todayNewAssigned = null;
         saveState(localState);
       }
       await SyncManager.pushNow();
@@ -507,7 +506,6 @@ function renderLoginForm(errorMsg = "") {
           localState.streak = merged.streak;
           localState.lastStreakDate = merged.lastStreakDate;
           localState.dailyNewCount = merged.dailyNewCount;
-          localState.todayNewAssigned = null;
           saveState(localState);
           saveSyncMeta({ lastPulledAt: new Date().toISOString() });
         } else {
