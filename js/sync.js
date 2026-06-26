@@ -124,6 +124,20 @@ function isSyncLoggedIn() {
   return !!loadSession()?.user;
 }
 
+// Normalize dailyNewCount: handle both old (number) and new (per-bank object) formats
+function _normalizeDailyNewCount(value) {
+  if (value == null) {
+    return { accounting: 5, english: 5 };
+  }
+  if (typeof value === "number") {
+    return { accounting: value, english: 5 };
+  }
+  if (typeof value === "object") {
+    return { accounting: value.accounting || 5, english: value.english || 5 };
+  }
+  return { accounting: 5, english: 5 };
+}
+
 // ---- 云端数据拉取 ----
 async function syncPull() {
   const sb = getSupabase();
@@ -148,7 +162,7 @@ async function syncPull() {
       completionHistory: data.completion_history || {},
       streak: data.streak || 0,
       lastStreakDate: data.last_streak_date || null,
-      dailyNewCount: data.daily_new_count || 5,
+      dailyNewCount: _normalizeDailyNewCount(data.daily_new_count),
       updatedAt: data.updated_at,
     },
   };
@@ -167,7 +181,7 @@ async function syncPush(localState) {
     completion_history: localState.completionHistory || {},
     streak: localState.streak || 0,
     last_streak_date: localState.lastStreakDate || null,
-    daily_new_count: localState.dailyNewCount || 5,
+    daily_new_count: _normalizeDailyNewCount(localState.dailyNewCount),
     updated_at: new Date().toISOString(),
   };
 
@@ -237,8 +251,8 @@ function mergeData(localState, cloudData) {
       (localState.lastStreakDate || "") > (cloudData.lastStreakDate || "")
         ? localState.lastStreakDate
         : cloudData.lastStreakDate,
-    // 每日新题数云端优先
-    dailyNewCount: cloudData.dailyNewCount || localState.dailyNewCount || 5,
+    // 每日新题数：本地优先（设置类数据，本地为准）
+    dailyNewCount: _normalizeDailyNewCount(localState.dailyNewCount),
   };
 }
 

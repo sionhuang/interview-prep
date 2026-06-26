@@ -5,6 +5,39 @@
 const INTERVALS = [2, 4, 7, 15];
 const DEFAULT_DAILY_NEW = 5;
 
+// ---- 题库配置 ----
+const QUESTIONS_BANKS = {
+  accounting: { label: "会计专业", icon: "📊", questions: [] },
+  english:    { label: "英文面试", icon: "🌐", questions: [] },
+};
+
+function getActiveBank() {
+  const state = loadState();
+  return state.activeBank || "accounting";
+}
+
+function setActiveBank(name) {
+  const state = loadState();
+  state.activeBank = name;
+  state.todayNewAssigned = null; // force reassign on bank switch
+  saveState(state);
+}
+
+function getActiveQuestions() {
+  const bank = getActiveBank();
+  return QUESTIONS_BANKS[bank]?.questions || [];
+}
+
+function getDailyNewCount(state) {
+  const s = state || loadState();
+  const bank = getActiveBank();
+  if (typeof s.dailyNewCount === "object" && s.dailyNewCount !== null) {
+    return s.dailyNewCount[bank] || DEFAULT_DAILY_NEW;
+  }
+  // Backward compat: old single-number format
+  return s.dailyNewCount || DEFAULT_DAILY_NEW;
+}
+
 function getNextReviewDate(completionDates) {
   if (!completionDates || completionDates.length === 0) return null;
   if (completionDates.length > INTERVALS.length) return null;
@@ -32,9 +65,10 @@ function defaultState() {
     completionHistory: {},
     streak: 0,
     lastStreakDate: null,
-    dailyNewCount: DEFAULT_DAILY_NEW,
+    dailyNewCount: { accounting: DEFAULT_DAILY_NEW, english: DEFAULT_DAILY_NEW },
     todayNewAssigned: null,
     debugDate: null,
+    activeBank: "accounting",
   };
 }
 
@@ -43,9 +77,21 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const s = JSON.parse(raw);
-      if (s.dailyNewCount == null) s.dailyNewCount = DEFAULT_DAILY_NEW;
+      let migrated = false;
+      // Migrate old format: single number → per-bank object
+      if (s.dailyNewCount == null) {
+        s.dailyNewCount = { accounting: DEFAULT_DAILY_NEW, english: DEFAULT_DAILY_NEW };
+        migrated = true;
+      } else if (typeof s.dailyNewCount === "number") {
+        s.dailyNewCount = { accounting: s.dailyNewCount, english: DEFAULT_DAILY_NEW };
+        migrated = true;
+      }
       if (s.todayNewAssigned == null) s.todayNewAssigned = null;
       if (s.debugDate == null) s.debugDate = null;
+      // Persist migration immediately so subsequent reads don't see old format
+      if (migrated) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+      }
       return s;
     }
   } catch (e) { /* ignore */ }
@@ -59,7 +105,7 @@ function saveState(state) {
 // ---- 每日新题分配 ----
 function getOrAssignTodayNew(state) {
   const today = getToday();
-  const count = state.dailyNewCount || DEFAULT_DAILY_NEW;
+  const count = getDailyNewCount(state);
 
   if (state.todayNewAssigned && state.todayNewAssigned.date === today) {
     return state.todayNewAssigned.questionIds;
@@ -75,7 +121,7 @@ function getOrAssignTodayNew(state) {
   }
 
   // 2. Fill remaining from unlearned (exclude carry-over)
-  const unlearned = QUESTIONS.filter(
+  const unlearned = getActiveQuestions().filter(
     (q) =>
       !carryOver.includes(q.id) &&
       (!state.completionHistory[q.id] || state.completionHistory[q.id].length === 0)
@@ -99,7 +145,7 @@ function getDailyTasks() {
   reLoadState(state); // refresh after getOrAssignTodayNew may have saved
 
   const reviewToday = [];
-  for (const q of QUESTIONS) {
+  for (const q of getActiveQuestions()) {
     const hist = state.completionHistory[q.id];
     if (!hist || hist.length === 0) continue;
     if (hist.length > INTERVALS.length) continue;
@@ -186,7 +232,11 @@ function setDailyNewCount(count) {
   const n = parseInt(count);
   if (isNaN(n) || n < 1 || n > 20) return false;
   const state = loadState();
-  state.dailyNewCount = n;
+  const bank = getActiveBank();
+  if (typeof state.dailyNewCount !== "object" || state.dailyNewCount === null) {
+    state.dailyNewCount = { accounting: DEFAULT_DAILY_NEW, english: DEFAULT_DAILY_NEW };
+  }
+  state.dailyNewCount[bank] = n;
   state.todayNewAssigned = null;
   saveState(state);
 
@@ -221,11 +271,11 @@ function getStats() {
     (id) => state.completionHistory[id] && state.completionHistory[id].length > INTERVALS.length
   ).length;
   return {
-    total: QUESTIONS.length,
+    total: getActiveQuestions().length,
     learned,
     mastered,
     streak: state.streak || 0,
-    dailyNewCount: state.dailyNewCount || DEFAULT_DAILY_NEW,
+    dailyNewCount: getDailyNewCount(state),
     debugDate: state.debugDate || null,
   };
 }
@@ -240,10 +290,49 @@ function getQuestionStatus(questionId) {
 
 // ---- 渲染 ----
 function renderAll() {
+  renderBankSwitcher();
   renderDailyTab();
   renderBrowseTab();
   renderStatsTab();
   updateHeader();
+}
+
+// --- Bank Switcher ---
+function renderBankSwitcher() {
+  const container = document.getElementById("bankSwitcher");
+  if (!container) return;
+
+  const active = getActiveBank();
+  let html = "";
+  for (const [key, bank] of Object.entries(QUESTIONS_BANKS)) {
+    if (bank.questions.length === 0) continue; // hide empty banks
+    const activeClass = key === active ? " active" : "";
+    html += `<button class="bank-btn${activeClass}" data-bank="${key}">${bank.icon} ${bank.label}</button>`;
+  }
+  container.innerHTML = html;
+}
+
+function initBankSwitcher() {
+  const container = document.getElementById("bankSwitcher");
+  if (!container) return;
+
+  container.addEventListener("click", (e) => {
+    const btn = e.target.closest(".bank-btn");
+    if (!btn) return;
+
+    const bank = btn.dataset.bank;
+    if (bank === getActiveBank()) return;
+
+    setActiveBank(bank);
+    // Clear browse filters when switching banks
+    const searchInput = document.getElementById("searchInput");
+    const statusFilter = document.getElementById("statusFilter");
+    if (searchInput) searchInput.value = "";
+    if (statusFilter) statusFilter.value = "all";
+    renderAll();
+  });
+
+  renderBankSwitcher();
 }
 
 // --- Header ---
@@ -287,7 +376,7 @@ function renderDailyTab() {
   if (settingsEl) {
     settingsEl.innerHTML = `
       <span class="setting-label">每日新题数：</span>
-      <input type="number" id="dailyCountInput" class="count-input" value="${state.dailyNewCount || DEFAULT_DAILY_NEW}" min="1" max="20">
+      <input type="number" id="dailyCountInput" class="count-input" value="${getDailyNewCount(state)}" min="1" max="20">
       <button id="applyCountBtn" class="btn-apply">应用</button>
       <span class="setting-hint">（修改后当日任务立即更新）</span>
     `;
@@ -336,7 +425,7 @@ function renderDailyTab() {
 }
 
 function renderQuestionCard(id, type) {
-  const q = QUESTIONS.find((q) => q.id === id);
+  const q = getActiveQuestions().find((q) => q.id === id);
   if (!q) return "";
 
   const checked = isQuestionCompleteToday(id) ? "checked" : "";
@@ -395,7 +484,7 @@ function bindSettingsEvents() {
       const val = parseInt(input.value);
       if (isNaN(val) || val < 1 || val > 20) {
         alert("请输入 1-20 之间的数字");
-        input.value = loadState().dailyNewCount || DEFAULT_DAILY_NEW;
+        input.value = getDailyNewCount();
         return;
       }
       if (setDailyNewCount(val)) {
@@ -411,7 +500,7 @@ function bindSettingsEvents() {
 // --- Browse Tab ---
 function renderBrowseTab(filter = "all", search = "") {
   const container = document.getElementById("browseList");
-  let filtered = [...QUESTIONS];
+  let filtered = [...getActiveQuestions()];
 
   if (filter !== "all") {
     filtered = filtered.filter((q) => getQuestionStatus(q.id) === filter);
@@ -584,7 +673,14 @@ function importData(jsonStr) {
     state.completionHistory = data.completionHistory;
     state.streak = data.streak || 0;
     state.lastStreakDate = data.lastStreakDate || null;
-    state.dailyNewCount = data.dailyNewCount || DEFAULT_DAILY_NEW;
+    // dailyNewCount: handle both old (number) and new (object) formats
+    if (data.dailyNewCount == null) {
+      state.dailyNewCount = { accounting: DEFAULT_DAILY_NEW, english: DEFAULT_DAILY_NEW };
+    } else if (typeof data.dailyNewCount === "number") {
+      state.dailyNewCount = { accounting: data.dailyNewCount, english: DEFAULT_DAILY_NEW };
+    } else {
+      state.dailyNewCount = data.dailyNewCount;
+    }
     // Reset date-dependent state so it recalculates
     state.todayNewAssigned = null;
     state.debugDate = null;
@@ -703,11 +799,18 @@ function initDebugPanel() {
 
 // ---- Init ----
 async function init() {
+  // Populate question banks
   if (typeof QUESTIONS === "undefined") {
     document.body.innerHTML =
       '<div style="text-align:center;padding:40px;">❌ 题库加载失败，请确保 questions.js 文件存在</div>';
     return;
   }
+  QUESTIONS_BANKS.accounting.questions = QUESTIONS;
+  if (typeof QUESTIONS_ENGLISH !== "undefined") {
+    QUESTIONS_BANKS.english.questions = QUESTIONS_ENGLISH;
+  }
+
+  initBankSwitcher();
   initTabs();
   initBrowseFilters();
   initReset();

@@ -1,4 +1,5 @@
 questions_raw.json
+questions_english_raw.json
 .claude/
 push.sh
 .git-credentials
