@@ -124,16 +124,24 @@ function isSyncLoggedIn() {
   return !!loadSession()?.user;
 }
 
-// Normalize dailyNewCount: handle both old (number) and new (per-bank object) formats
+// Normalize dailyNewCount: handle string (JSON), number (old), and object formats
 function _normalizeDailyNewCount(value) {
-  if (value == null) {
-    return { accounting: 5, english: 5 };
+  // String: JSON-encoded object stored in Supabase (current format)
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (typeof parsed === "object" && parsed !== null) {
+        return { accounting: parsed.accounting || 5, english: parsed.english || 5 };
+      }
+    } catch (e) { /* fall through */ }
   }
+  // Object: already deserialized (JSONB column or local state)
+  if (typeof value === "object" && value !== null) {
+    return { accounting: value.accounting || 5, english: value.english || 5 };
+  }
+  // Number: old format (single integer)
   if (typeof value === "number") {
     return { accounting: value, english: 5 };
-  }
-  if (typeof value === "object") {
-    return { accounting: value.accounting || 5, english: value.english || 5 };
   }
   return { accounting: 5, english: 5 };
 }
@@ -181,7 +189,7 @@ async function syncPush(localState) {
     completion_history: localState.completionHistory || {},
     streak: localState.streak || 0,
     last_streak_date: localState.lastStreakDate || null,
-    daily_new_count: _normalizeDailyNewCount(localState.dailyNewCount),
+    daily_new_count: JSON.stringify(_normalizeDailyNewCount(localState.dailyNewCount)),
     updated_at: new Date().toISOString(),
   };
 
