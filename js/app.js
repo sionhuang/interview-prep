@@ -19,7 +19,6 @@ function getActiveBank() {
 function setActiveBank(name) {
   const state = loadState();
   state.activeBank = name;
-  state.todayNewAssigned = null; // force reassign on bank switch
   saveState(state);
 }
 
@@ -66,7 +65,8 @@ function defaultState() {
     streak: 0,
     lastStreakDate: null,
     dailyNewCount: { accounting: DEFAULT_DAILY_NEW, english: DEFAULT_DAILY_NEW },
-    todayNewAssigned: null,
+    todayNewAssigned: {},
+    manuallyAddedToday: {},
     debugDate: null,
     activeBank: "accounting",
   };
@@ -78,7 +78,7 @@ function loadState() {
     if (raw) {
       const s = JSON.parse(raw);
       let migrated = false;
-      // Migrate old format: single number → per-bank object
+      // Migrate dailyNewCount: single number → per-bank object
       if (s.dailyNewCount == null) {
         s.dailyNewCount = { accounting: DEFAULT_DAILY_NEW, english: DEFAULT_DAILY_NEW };
         migrated = true;
@@ -86,8 +86,19 @@ function loadState() {
         s.dailyNewCount = { accounting: s.dailyNewCount, english: DEFAULT_DAILY_NEW };
         migrated = true;
       }
-      if (s.todayNewAssigned == null) s.todayNewAssigned = null;
+      // Migrate todayNewAssigned & manuallyAddedToday: flat → per-bank
+      if (s.todayNewAssigned == null || !s.todayNewAssigned.accounting) {
+        const oldAssigned = (s.todayNewAssigned && s.todayNewAssigned.date) ? s.todayNewAssigned : null;
+        s.todayNewAssigned = { accounting: oldAssigned, english: null };
+        migrated = true;
+      }
+      if (s.manuallyAddedToday == null || !s.manuallyAddedToday.accounting) {
+        const oldManual = (s.manuallyAddedToday && s.manuallyAddedToday.date) ? s.manuallyAddedToday : null;
+        s.manuallyAddedToday = { accounting: oldManual, english: null };
+        migrated = true;
+      }
       if (s.debugDate == null) s.debugDate = null;
+      if (s.activeBank == null) s.activeBank = "accounting";
       // Persist migration immediately so subsequent reads don't see old format
       if (migrated) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
@@ -106,17 +117,19 @@ function saveState(state) {
 function getOrAssignTodayNew(state) {
   const today = getToday();
   const count = getDailyNewCount(state);
+  const bank = getActiveBank();
 
-  if (state.todayNewAssigned && state.todayNewAssigned.date === today) {
-    return state.todayNewAssigned.questionIds;
+  const bankAssigned = state.todayNewAssigned[bank];
+  if (bankAssigned && bankAssigned.date === today) {
+    return bankAssigned.questionIds;
   }
 
   // 1. Carry over unfinished from yesterday's assignment
   let carryOver = [];
-  if (state.todayNewAssigned) {
-    carryOver = state.todayNewAssigned.questionIds.filter((id) => {
+  if (bankAssigned) {
+    carryOver = bankAssigned.questionIds.filter((id) => {
       const hist = state.completionHistory[id] || [];
-      return !hist.includes(state.todayNewAssigned.date);
+      return !hist.includes(bankAssigned.date);
     });
   }
 
@@ -129,11 +142,77 @@ function getOrAssignTodayNew(state) {
   const remaining = Math.max(0, count - carryOver.length);
   const fresh = unlearned.slice(0, remaining).map((q) => q.id);
 
-  const assigned = [...carryOver, ...fresh];
+  let assigned = [...carryOver, ...fresh];
 
-  state.todayNewAssigned = { date: today, questionIds: assigned };
+  // Merge manually added IDs for this bank (survive reassignment)
+  const manual = state.manuallyAddedToday[bank];
+  if (manual && manual.date === today) {
+    for (const mid of manual.ids) {
+      if (!assigned.includes(mid)) {
+        assigned.push(mid);
+      }
+    }
+  }
+
+  state.todayNewAssigned[bank] = { date: today, questionIds: assigned };
   saveState(state);
   return assigned;
+}
+
+// ---- 手动加入今日任务 ----
+function getOrCreateTodayManual(state) {
+  const today = getToday();
+  const bank = getActiveBank();
+  if (state.manuallyAddedToday[bank] && state.manuallyAddedToday[bank].date === today) {
+    return state.manuallyAddedToday[bank];
+  }
+  state.manuallyAddedToday[bank] = { date: today, ids: [] };
+  saveState(state);
+  return state.manuallyAddedToday[bank];
+}
+
+function isManuallyAdded(questionId) {
+  const state = loadState();
+  const bank = getActiveBank();
+  const manual = state.manuallyAddedToday[bank];
+  return manual && manual.ids ? manual.ids.includes(questionId) : false;
+}
+
+function addToTodayTasks(questionId) {
+  const state = loadState();
+  const bank = getActiveBank();
+  const manual = getOrCreateTodayManual(state);
+  if (!manual.ids.includes(questionId)) {
+    manual.ids.push(questionId);
+  }
+  // Also ensure it's in todayNewAssigned for the current bank
+  const today = getToday();
+  if (!state.todayNewAssigned[bank] || state.todayNewAssigned[bank].date !== today) {
+    state.todayNewAssigned[bank] = { date: today, questionIds: [] };
+  }
+  if (!state.todayNewAssigned[bank].questionIds.includes(questionId)) {
+    state.todayNewAssigned[bank].questionIds.push(questionId);
+  }
+  saveState(state);
+  renderAll();
+  if (typeof SyncManager !== "undefined") SyncManager.schedulePush();
+}
+
+function removeFromTodayTasks(questionId) {
+  const state = loadState();
+  const bank = getActiveBank();
+  const manual = state.manuallyAddedToday[bank];
+  if (manual && manual.ids) {
+    manual.ids = manual.ids.filter((id) => id !== questionId);
+  }
+  // Also remove from todayNewAssigned
+  const assigned = state.todayNewAssigned[bank];
+  if (assigned) {
+    assigned.questionIds = assigned.questionIds.filter((id) => id !== questionId);
+  }
+  saveState(state);
+  renderAll();
+  if (typeof SyncManager !== "undefined") SyncManager.schedulePush();
 }
 
 // ---- 每日任务计算 ----
@@ -237,7 +316,7 @@ function setDailyNewCount(count) {
     state.dailyNewCount = { accounting: DEFAULT_DAILY_NEW, english: DEFAULT_DAILY_NEW };
   }
   state.dailyNewCount[bank] = n;
-  state.todayNewAssigned = null;
+  state.todayNewAssigned[bank] = null; // force reassign for this bank
   saveState(state);
 
   // 触发云端同步
@@ -253,10 +332,12 @@ function setDebugDate(dateStr) {
   const state = loadState();
   if (dateStr) {
     state.debugDate = dateStr;
-    state.todayNewAssigned = null; // force reassign on date change
+    state.todayNewAssigned = {}; // force reassign on date change (all banks)
+    state.manuallyAddedToday = {};
   } else {
     state.debugDate = null;
-    state.todayNewAssigned = null;
+    state.todayNewAssigned = {};
+    state.manuallyAddedToday = {};
   }
   saveState(state);
 }
@@ -429,8 +510,9 @@ function renderQuestionCard(id, type) {
   if (!q) return "";
 
   const checked = isQuestionCompleteToday(id) ? "checked" : "";
-  const tagClass = type === "new" ? "new" : "review";
-  const tagText = type === "new" ? "新题" : "复习";
+  const isManual = type === "new" && isManuallyAdded(id);
+  const tagClass = isManual ? "manual" : (type === "new" ? "new" : "review");
+  const tagText = isManual ? "📌 手动" : (type === "new" ? "新题" : "复习");
 
   return `
     <div class="question-card" data-id="${id}">
@@ -524,6 +606,9 @@ function renderBrowseTab(filter = "all", search = "") {
         learning: '<span class="qc-tag new">学习中</span>',
         done: '<span class="qc-tag done">已掌握</span>',
       };
+      const added = isManuallyAdded(q.id);
+      const btnLabel = added ? "✓ 已加入" : "＋ 加入今日";
+      const btnClass = added ? "add-today-btn added" : "add-today-btn";
       return `
         <div class="question-card" data-id="${q.id}">
           <div class="qc-header" data-action="expand">
@@ -534,6 +619,7 @@ function renderBrowseTab(filter = "all", search = "") {
                 ${q.keys ? `<span style="font-size:.75rem;color:var(--text-secondary);">${escapeHtml(q.keys.substring(0, 50))}${q.keys.length > 50 ? "..." : ""}</span>` : ""}
               </div>
             </div>
+            <button class="${btnClass}" data-add-id="${q.id}" data-action="addToday">${btnLabel}</button>
             <span class="qc-expand">▼</span>
           </div>
           <div class="qc-body">
@@ -548,12 +634,26 @@ function renderBrowseTab(filter = "all", search = "") {
     .join("");
 
   document.querySelectorAll("#browseList .qc-header").forEach((header) => {
-    header.addEventListener("click", function () {
+    header.addEventListener("click", function (e) {
+      // Don't expand card when clicking the add button
+      if (e.target.closest("[data-action='addToday']")) return;
       const card = this.closest(".question-card");
       const body = card.querySelector(".qc-body");
       const arrow = this.querySelector(".qc-expand");
       body.classList.toggle("open");
       if (arrow) arrow.classList.toggle("open");
+    });
+  });
+
+  document.querySelectorAll("#browseList [data-action='addToday']").forEach((btn) => {
+    btn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      const id = parseInt(this.dataset.addId);
+      if (isManuallyAdded(id)) {
+        removeFromTodayTasks(id);
+      } else {
+        addToTodayTasks(id);
+      }
     });
   });
 }
@@ -682,7 +782,8 @@ function importData(jsonStr) {
       state.dailyNewCount = data.dailyNewCount;
     }
     // Reset date-dependent state so it recalculates
-    state.todayNewAssigned = null;
+    state.todayNewAssigned = {};
+    state.manuallyAddedToday = {};
     state.debugDate = null;
     saveState(state);
     return true;

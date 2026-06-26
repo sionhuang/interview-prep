@@ -82,6 +82,41 @@ body {
 }
 .tab:hover:not(.active) { background: var(--primary-light); color: var(--primary); }
 
+/* Add-to-today button (browse cards) */
+.add-today-btn {
+  padding: 4px 12px;
+  border: 1.5px solid var(--primary);
+  background: var(--card);
+  color: var(--primary);
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: .78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all .15s;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+.add-today-btn:hover {
+  background: var(--primary);
+  color: #fff;
+}
+.add-today-btn.added {
+  background: var(--success-light);
+  color: var(--success);
+  border-color: var(--success);
+}
+.add-today-btn.added:hover {
+  background: var(--success);
+  color: #fff;
+}
+
+/* Manual tag (daily tasks) */
+.qc-tag.manual {
+  background: #f3e8ff;
+  color: #7c3aed;
+}
+
 /* Bank Switcher */
 .bank-switcher {
   display: flex;
