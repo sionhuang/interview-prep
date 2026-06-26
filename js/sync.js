@@ -52,23 +52,36 @@ async function syncRestoreSession() {
   if (!sb) return null;
 
   const saved = loadSession();
-  if (!saved) return null;
+  if (!saved || !saved.refresh_token || !saved.access_token) return null;
 
-  // 尝试验证并恢复会话
   try {
-    // 先尝试用 refresh token 恢复
-    if (saved.refresh_token) {
-      const { data, error } = await sb.auth.refreshSession({
-        refresh_token: saved.refresh_token,
-      });
-      if (!error && data.session) {
-        saveSession(data.session);
-        return data.session;
-      }
+    // 用 setSession 恢复，token 过期会自动刷新
+    const { data, error } = await sb.auth.setSession({
+      access_token: saved.access_token,
+      refresh_token: saved.refresh_token,
+    });
+
+    if (!error && data.session) {
+      saveSession(data.session);
+      return data.session;
     }
   } catch (e) {
-    /* refresh failed, session expired */
+    /* restore failed */
   }
+
+  // setSession 失败，尝试用 refreshSession
+  try {
+    const { data, error } = await sb.auth.refreshSession({
+      refresh_token: saved.refresh_token,
+    });
+    if (!error && data.session) {
+      saveSession(data.session);
+      return data.session;
+    }
+  } catch (e) {
+    /* all attempts failed */
+  }
+
   clearSession();
   return null;
 }
