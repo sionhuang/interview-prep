@@ -232,7 +232,6 @@ body {
   background: var(--card);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  overflow: hidden;
   transition: box-shadow .2s;
 }
 .question-card:hover { box-shadow: var(--shadow-md); }
