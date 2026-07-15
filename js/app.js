@@ -566,6 +566,59 @@ function renderQuestionCard(id, type) {
   `;
 }
 
+function enterEditMode(card, id, q) {
+  const body = card.querySelector(".qc-body-inner");
+  const editBar = body.querySelector(".qc-edit-bar");
+
+  let editHtml = "";
+  if (q.keys) {
+    editHtml += `<div class="qc-keys"><div class="qc-keys-label">🔑 关键点</div><textarea class="edit-textarea" data-field="keys" rows="4">${escapeHtml(q.keys)}</textarea></div>`;
+  }
+  editHtml += `<div class="qc-answer"><div class="qc-answer-label">📝 参考答案</div><textarea class="edit-textarea" data-field="answer" rows="8">${escapeHtml(q.answer)}</textarea></div>`;
+
+  body.innerHTML = editHtml;
+  editBar.innerHTML = `
+    <button class="btn-edit-save" data-action="editSave">💾 保存</button>
+    <button class="btn-edit-cancel" data-action="editCancel">取消</button>
+  `;
+
+  // Save
+  body.querySelector("[data-action='editSave']").addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    const fields = {};
+    body.querySelectorAll(".edit-textarea").forEach((ta) => {
+      fields[ta.dataset.field] = ta.value;
+    });
+    saveQuestionEdit(id, fields);
+    exitEditMode(card, id);
+  });
+
+  // Cancel
+  body.querySelector("[data-action='editCancel']").addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    exitEditMode(card, id);
+  });
+}
+
+function exitEditMode(card, id) {
+  const q = getQuestion(id);
+  const body = card.querySelector(".qc-body-inner");
+  let html = "";
+  if (q.keys) {
+    html += `<div class="qc-keys" data-field="keys"><div class="qc-keys-label">🔑 关键点</div><div class="qc-keys-content">${escapeHtml(q.keys)}</div></div>`;
+  }
+  html += `<div class="qc-answer"><div class="qc-answer-label">📝 参考答案</div><div class="qc-answer-content">${escapeHtml(q.answer)}</div></div>`;
+  html += `<div class="qc-edit-bar"><button class="btn-edit" data-action="editStart">✏️ 编辑</button></div>`;
+  body.innerHTML = html;
+  // Re-bind edit
+  body.querySelector("[data-action='editStart']").addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    const q2 = getQuestion(id);
+    if (!q2) return;
+    enterEditMode(card, id, q2);
+  });
+}
+
 function bindCardEvents() {
   document.querySelectorAll(".qc-header").forEach((header) => {
     header.addEventListener("click", function (e) {
@@ -595,48 +648,7 @@ function bindCardEvents() {
       const id = parseInt(card.dataset.id);
       const q = getQuestion(id);
       if (!q) return;
-
-      const body = card.querySelector(".qc-body-inner");
-      const keysEl = body.querySelector(".qc-keys-content");
-      const answerEl = body.querySelector(".qc-answer-content");
-      const editBar = body.querySelector(".qc-edit-bar");
-
-      // Store original for cancel
-      const origKeys = q.keys;
-      const origAnswer = q.answer;
-
-      // Replace content divs with textareas
-      let editHtml = "";
-      if (keysEl) {
-        editHtml += `<div class="qc-keys"><div class="qc-keys-label">🔑 关键点</div><textarea class="edit-textarea" data-field="keys" rows="4">${escapeHtml(origKeys)}</textarea></div>`;
-      }
-      editHtml += `<div class="qc-answer"><div class="qc-answer-label">📝 参考答案</div><textarea class="edit-textarea" data-field="answer" rows="8">${escapeHtml(origAnswer)}</textarea></div>`;
-
-      // Save original HTML for cancel
-      const origHtml = body.innerHTML;
-
-      body.innerHTML = editHtml;
-      editBar.innerHTML = `
-        <button class="btn-edit-save" data-action="editSave">💾 保存</button>
-        <button class="btn-edit-cancel" data-action="editCancel">取消</button>
-      `;
-
-      // Save handler
-      body.querySelector("[data-action='editSave']").addEventListener("click", function (ev) {
-        ev.stopPropagation();
-        const fields = {};
-        body.querySelectorAll(".edit-textarea").forEach((ta) => {
-          fields[ta.dataset.field] = ta.value.trim();
-        });
-        saveQuestionEdit(id, fields);
-        renderAll();
-      });
-
-      // Cancel handler
-      body.querySelector("[data-action='editCancel']").addEventListener("click", function (ev) {
-        ev.stopPropagation();
-        renderAll();
-      });
+      enterEditMode(card, id, q);
     });
   });
 }
