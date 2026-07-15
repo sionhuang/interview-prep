@@ -568,19 +568,18 @@ function renderQuestionCard(id, type) {
 
 function enterEditMode(card, id, q) {
   const body = card.querySelector(".qc-body-inner");
-  const editBar = body.querySelector(".qc-edit-bar");
 
   let editHtml = "";
   if (q.keys) {
     editHtml += `<div class="qc-keys"><div class="qc-keys-label">🔑 关键点</div><textarea class="edit-textarea" data-field="keys" rows="4">${escapeHtml(q.keys)}</textarea></div>`;
   }
   editHtml += `<div class="qc-answer"><div class="qc-answer-label">📝 参考答案</div><textarea class="edit-textarea" data-field="answer" rows="8">${escapeHtml(q.answer)}</textarea></div>`;
-
-  body.innerHTML = editHtml;
-  editBar.innerHTML = `
+  editHtml += `<div class="qc-edit-bar">
     <button class="btn-edit-save" data-action="editSave">💾 保存</button>
     <button class="btn-edit-cancel" data-action="editCancel">取消</button>
-  `;
+  </div>`;
+
+  body.innerHTML = editHtml;
 
   // Save
   body.querySelector("[data-action='editSave']").addEventListener("click", function (ev) {
