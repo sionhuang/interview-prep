@@ -570,7 +570,7 @@ function bindCardEvents() {
   document.querySelectorAll(".qc-header").forEach((header) => {
     header.addEventListener("click", function (e) {
       if (e.target.classList.contains("qc-checkbox")) return;
-      if (e.target.closest("[data-action]")) return;
+      if (e.target.closest("button[data-action]")) return;
       const card = this.closest(".question-card");
       const body = card.querySelector(".qc-body");
       const arrow = this.querySelector(".qc-expand");
