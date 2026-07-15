@@ -312,6 +312,48 @@ body {
 }
 .qc-answer-label { font-weight: 600; color: var(--text); margin-bottom: 4px; }
 
+/* Edit Mode */
+.qc-edit-bar { margin-top: 12px; text-align: right; }
+.btn-edit {
+  padding: 4px 14px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text-secondary);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .78rem;
+  transition: all .2s;
+}
+.btn-edit:hover { border-color: var(--primary); color: var(--primary); }
+
+.edit-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  font-size: .88rem;
+  line-height: 1.7;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  background: #fafbff;
+}
+.edit-textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary-light); }
+
+.btn-edit-save, .btn-edit-cancel {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: .82rem;
+  font-weight: 500;
+  transition: opacity .2s;
+}
+.btn-edit-save { background: var(--primary); color: #fff; margin-right: 8px; }
+.btn-edit-save:hover { opacity: .85; }
+.btn-edit-cancel { background: #f1f5f9; color: var(--text-secondary); border: 1px solid var(--border); }
+.btn-edit-cancel:hover { background: #e2e8f0; }
+
 /* All Done */
 .all-done {
   text-align: center;

@@ -171,6 +171,7 @@ async function syncPull() {
       streak: data.streak || 0,
       lastStreakDate: data.last_streak_date || null,
       dailyNewCount: _normalizeDailyNewCount(data.daily_new_count),
+      editedQuestions: data.edited_questions || {},
       updatedAt: data.updated_at,
     },
   };
@@ -190,6 +191,7 @@ async function syncPush(localState) {
     streak: localState.streak || 0,
     last_streak_date: localState.lastStreakDate || null,
     daily_new_count: JSON.stringify(_normalizeDailyNewCount(localState.dailyNewCount)),
+    edited_questions: localState.editedQuestions || {},
     updated_at: new Date().toISOString(),
   };
 
@@ -261,6 +263,11 @@ function mergeData(localState, cloudData) {
         : cloudData.lastStreakDate,
     // 每日新题数：本地优先（设置类数据，本地为准）
     dailyNewCount: _normalizeDailyNewCount(localState.dailyNewCount),
+    // 编辑数据：合并，本地优先
+    editedQuestions: {
+      ...(cloudData.editedQuestions || {}),
+      ...(localState.editedQuestions || {}),
+    },
   };
 }
 
@@ -317,6 +324,7 @@ const SyncManager = {
         localState.streak = merged.streak;
         localState.lastStreakDate = merged.lastStreakDate;
         localState.dailyNewCount = merged.dailyNewCount;
+        localState.editedQuestions = merged.editedQuestions;
         saveState(localState);
       }
 
@@ -363,6 +371,7 @@ const SyncManager = {
         localState.streak = merged.streak;
         localState.lastStreakDate = merged.lastStreakDate;
         localState.dailyNewCount = merged.dailyNewCount;
+        localState.editedQuestions = merged.editedQuestions;
         // 注意：不重置 todayNewAssigned，保持当日任务分配不变
         saveState(localState);
         saveSyncMeta({ lastPulledAt: new Date().toISOString() });
@@ -482,6 +491,7 @@ function renderLoginForm(errorMsg = "") {
         localState.streak = merged.streak;
         localState.lastStreakDate = merged.lastStreakDate;
         localState.dailyNewCount = merged.dailyNewCount;
+        localState.editedQuestions = merged.editedQuestions;
         saveState(localState);
       }
       await SyncManager.pushNow();
@@ -541,6 +551,7 @@ function renderLoginForm(errorMsg = "") {
           localState.streak = merged.streak;
           localState.lastStreakDate = merged.lastStreakDate;
           localState.dailyNewCount = merged.dailyNewCount;
+        localState.editedQuestions = merged.editedQuestions;
           saveState(localState);
           saveSyncMeta({ lastPulledAt: new Date().toISOString() });
         } else {
